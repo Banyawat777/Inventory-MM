@@ -283,6 +283,16 @@ function saveLocalDatabase(db) {
     localStorage.setItem('kook_furniture_db_v3', JSON.stringify(db));
 }
 
+// Helper to parse 'DD/MM/YYYY HH:MM' date format into timestamp
+function parseLastModified(str) {
+    if (!str) return 0;
+    const parts = str.split(' ');
+    if (parts.length < 2) return 0;
+    const [d, m, y] = parts[0].split('/');
+    const [hh, mm] = parts[1].split(':');
+    return new Date(y, m - 1, d, hh, mm).getTime();
+}
+
 // Fetch entire data block based on mode (Local Storage or Apps Script Cloud)
 async function fetchBrandData(brandName) {
     if (isCloudConnected && cloudScriptUrl) {
@@ -293,18 +303,71 @@ async function fetchBrandData(brandName) {
             if (result.status === 'success') {
                 const cloudData = result.data;
                 
-                // 💡 AUTO-MIGRATION BUG FIX:
-                // If cloud data is empty but we have local database items,
-                // migrate and upload our local database to Google Sheets instead of overwriting with empty!
+                // 💡 SMART OFFLINE MERGE & CONFLICT RESOLUTION:
+                // Compare and merge items registered or modified offline with the cloud database.
                 const localDb = getLocalDatabase();
                 const localBrandData = localDb[brandName];
                 
-                if (localBrandData && localBrandData.furniture && localBrandData.furniture.length > 0 &&
-                    (!cloudData.furniture || cloudData.furniture.length === 0)) {
-                    console.log(`Cloud data for ${brandName} is empty. Migrating local database to Google Sheets...`);
-                    // Use a flag to avoid infinite loops
-                    await syncBrandData(brandName, localBrandData);
-                    return localBrandData;
+                if (localBrandData && localBrandData.furniture && localBrandData.furniture.length > 0) {
+                    let hasMergeChanges = false;
+                    
+                    // Initialize cloud fields if missing
+                    if (!cloudData.furniture) cloudData.furniture = [];
+                    if (!cloudData.logs) cloudData.logs = [];
+                    if (!cloudData.branches) cloudData.branches = [];
+                    
+                    // 1. Merge and resolve conflicts for furniture items
+                    localBrandData.furniture.forEach(localItem => {
+                        const cloudItemIdx = cloudData.furniture.findIndex(cloudItem => cloudItem.barcode === localItem.barcode);
+                        if (cloudItemIdx === -1) {
+                            // Brand new item registered while offline
+                            cloudData.furniture.push(localItem);
+                            hasMergeChanges = true;
+                            console.log(`Auto-merged offline item: ${localItem.code} (${localItem.barcode})`);
+                        } else {
+                            // Existing item: Overwrite only if local version is newer
+                            const localTime = parseLastModified(localItem.lastModified);
+                            const cloudTime = parseLastModified(cloudData.furniture[cloudItemIdx].lastModified);
+                            if (localTime > cloudTime) {
+                                cloudData.furniture[cloudItemIdx] = localItem;
+                                hasMergeChanges = true;
+                                console.log(`Auto-resolved conflict (local newer): ${localItem.code}`);
+                            }
+                        }
+                    });
+                    
+                    // 2. Merge movement logs
+                    if (localBrandData.logs) {
+                        localBrandData.logs.forEach(localLog => {
+                            const existsInCloud = cloudData.logs.some(cloudLog => 
+                                cloudLog.barcode === localLog.barcode && 
+                                cloudLog.action === localLog.action && 
+                                cloudLog.date === localLog.date && 
+                                cloudLog.time === localLog.time
+                            );
+                            if (!existsInCloud) {
+                                cloudData.logs.push(localLog);
+                                hasMergeChanges = true;
+                            }
+                        });
+                    }
+                    
+                    // 3. Merge branches
+                    if (localBrandData.branches) {
+                        localBrandData.branches.forEach(localBranch => {
+                            const existsInCloud = cloudData.branches.some(cloudBranch => cloudBranch.name === localBranch.name);
+                            if (!existsInCloud) {
+                                cloudData.branches.push(localBranch);
+                                hasMergeChanges = true;
+                            }
+                        });
+                    }
+                    
+                    // If changes were merged, update Google Sheets in the background
+                    if (hasMergeChanges) {
+                        console.log(`Syncing merged data for ${brandName} back to Google Sheets...`);
+                        await syncBrandData(brandName, cloudData);
+                    }
                 }
                 
                 return cloudData; // Expected format: { branches: [...], furniture: [...], logs: [...] }
@@ -2728,15 +2791,28 @@ function updateConnectionStatusUI() {
     const box = document.getElementById('settings-status-box');
     const text = document.getElementById('settings-status-text');
     const disconnectArea = document.getElementById('settings-disconnect-area');
+    const qrArea = document.getElementById('settings-qr-area');
+    const qrImg = document.getElementById('settings-qr-img');
     
     if (isCloudConnected && cloudScriptUrl) {
         box.className = "connection-status-box connected";
         text.innerText = "เชื่อมต่อระบบคลาวด์แล้ว (บันทึกเข้า Google Sheets เรียบร้อย)";
         disconnectArea.style.display = 'block';
+        
+        if (qrArea && qrImg) {
+            const currentSiteUrl = window.location.origin + window.location.pathname;
+            const mobileConfigUrl = `${currentSiteUrl}?cloud_url=${encodeURIComponent(cloudScriptUrl)}`;
+            qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(mobileConfigUrl)}`;
+            qrArea.style.display = 'block';
+        }
     } else {
         box.className = "connection-status-box disconnected";
         text.innerText = "โหมดออฟไลน์ (LocalStorage Mode)";
         disconnectArea.style.display = 'none';
+        
+        if (qrArea) {
+            qrArea.style.display = 'none';
+        }
     }
 }
 
@@ -2995,11 +3071,31 @@ window.addEventListener('DOMContentLoaded', () => {
     // 1. Initial local database load
     getLocalDatabase();
     
-    // 2. Read saved cloud settings
-    const savedCloudUrl = localStorage.getItem('kook_cloud_sheets_url');
-    if (savedCloudUrl) {
-        cloudScriptUrl = savedCloudUrl;
+    // Check for auto-configure cloud_url query parameter (e.g. from QR scan)
+    const urlParams = new URLSearchParams(window.location.search);
+    const cloudUrlParam = urlParams.get('cloud_url');
+    if (cloudUrlParam) {
+        const decodedUrl = decodeURIComponent(cloudUrlParam);
+        localStorage.setItem('kook_cloud_sheets_url', decodedUrl);
+        cloudScriptUrl = decodedUrl;
         isCloudConnected = true;
+        
+        // Clean URL to prevent re-triggering and keeping clutter
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+        
+        // Show elegant custom notification after brief delay
+        setTimeout(() => {
+            showSyncNotification('✓ เชื่อมต่อระบบคลาวด์อัตโนมัติสำเร็จ! 🟢');
+            renderDashboard();
+        }, 500);
+    } else {
+        // 2. Read saved cloud settings
+        const savedCloudUrl = localStorage.getItem('kook_cloud_sheets_url');
+        if (savedCloudUrl) {
+            cloudScriptUrl = savedCloudUrl;
+            isCloudConnected = true;
+        }
     }
     
     // 3. Show/hide sync button based on cloud connection state
