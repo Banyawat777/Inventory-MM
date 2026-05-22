@@ -11,3 +11,6 @@ Desktop.ini
 *.njsproj
 *.sln
 *.swp
+
+# Local Netlify folder
+.netlify
