@@ -1,4 +1,10 @@
 // ==========================================================================
+// CONFIGURATION: กำหนดลิงก์คลาวด์ตรงนี้ (เพื่อให้ระบายข้อมูลลง Google Sheets อัตโนมัติ)
+// หากยังไม่มีลิงก์ ให้ใส่เป็น "" หรือ "YOUR_APPS_SCRIPT_URL_HERE" ระบบจะทำงานในโหมดออฟไลน์ LocalStorage
+// ==========================================================================
+const HARDCODED_CLOUD_URL = "YOUR_APPS_SCRIPT_URL_HERE";
+
+// ==========================================================================
 // 1. Initial State & In-memory Databases (Seed Data)
 // ==========================================================================
 
@@ -503,10 +509,6 @@ function switchView(viewName) {
             document.getElementById('bulk-delete-bar').style.display = 'none';
             document.getElementById('admin-select-all-check').checked = false;
             renderAdminTable();
-            break;
-        case 'settings':
-            viewTitle.innerText = "ตั้งค่าการเชื่อมต่อ Google Sheets & Drive";
-            renderSettingsPage();
             break;
     }
     
@@ -2773,295 +2775,8 @@ async function executeBarcodeLookup(barcodeOrCodeString) {
 }
 
 // ==========================================================================
-// 9. Google Sheets Settings Panel Controls
+// 9. Obsolete Settings UI (Removed)
 // ==========================================================================
-
-function renderSettingsPage() {
-    const savedUrl = localStorage.getItem('kook_cloud_sheets_url') || "";
-    document.getElementById('settings-script-url').value = savedUrl;
-    
-    updateConnectionStatusUI();
-    
-    // Set Google Apps Script Code block content so users can copy
-    const codeArea = document.getElementById('apps-script-code-area');
-    codeArea.innerText = getGoogleAppsScriptCode();
-}
-
-function updateConnectionStatusUI() {
-    const box = document.getElementById('settings-status-box');
-    const text = document.getElementById('settings-status-text');
-    const disconnectArea = document.getElementById('settings-disconnect-area');
-    const qrArea = document.getElementById('settings-qr-area');
-    const qrImg = document.getElementById('settings-qr-img');
-    
-    if (isCloudConnected && cloudScriptUrl) {
-        box.className = "connection-status-box connected";
-        text.innerText = "เชื่อมต่อระบบคลาวด์แล้ว (บันทึกเข้า Google Sheets เรียบร้อย)";
-        disconnectArea.style.display = 'block';
-        
-        if (qrArea && qrImg) {
-            const currentSiteUrl = window.location.origin + window.location.pathname;
-            const mobileConfigUrl = `${currentSiteUrl}?cloud_url=${encodeURIComponent(cloudScriptUrl)}`;
-            qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(mobileConfigUrl)}`;
-            qrArea.style.display = 'block';
-        }
-    } else {
-        box.className = "connection-status-box disconnected";
-        text.innerText = "โหมดออฟไลน์ (LocalStorage Mode)";
-        disconnectArea.style.display = 'none';
-        
-        if (qrArea) {
-            qrArea.style.display = 'none';
-        }
-    }
-}
-
-function saveConnectionSettings() {
-    const url = document.getElementById('settings-script-url').value.trim();
-    if (!url) {
-        alert("กรุณากรอก Google Apps Script Web App URL ที่ถูกต้อง!");
-        return;
-    }
-    
-    localStorage.setItem('kook_cloud_sheets_url', url);
-    cloudScriptUrl = url;
-    isCloudConnected = true;
-    
-    updateConnectionStatusUI();
-    updateCloudSyncButtonVisibility();
-    alert("บันทึกการเชื่อมต่อเรียบร้อย! ระบบสลับเข้าโหมด Google Sheets & Drive คลาวด์สำเร็จ");
-    
-    // Fetch fresh database from cloud instantly
-    renderDashboard();
-}
-
-function disconnectCloud() {
-    localStorage.removeItem('kook_cloud_sheets_url');
-    cloudScriptUrl = "";
-    isCloudConnected = false;
-    
-    updateConnectionStatusUI();
-    updateCloudSyncButtonVisibility();
-    document.getElementById('settings-script-url').value = "";
-    alert("ตัดการเชื่อมต่อระบบคลาวด์แล้ว! ระบบกลับเข้าสู่โหมดเก็บข้อมูลออฟไลน์ (Local Storage)");
-    
-    renderDashboard();
-}
-
-async function testConnection() {
-    const url = document.getElementById('settings-script-url').value.trim();
-    if (!url) {
-        alert("กรุณากรอก URL เพื่อทดสอบเชื่อมต่อ!");
-        return;
-    }
-    
-    try {
-        // Send a simple ping GET request to validator
-        const response = await fetch(`${url}?action=ping`);
-        const result = await response.json();
-        
-        if (result && result.status === 'pong') {
-            alert("✓ การทดสอบการเชื่อมต่อสำเร็จ! Google Sheets พร้อมใช้งานสำหรับการเขียนข้อมูลประวัติสินค้า");
-        } else {
-            alert("⚠️ เชื่อมต่อไม่ได้: ลิงก์ถูกต้องแต่ไม่ตอบกลับ pong กลับมา ตรวจสอบสิทธิ์การ Deploy (Anyone)");
-        }
-    } catch (e) {
-        alert("❌ การเชื่อมต่อล้มเหลว: ตรวจสอบความถูกต้องของลิงก์ และตรวจสอบว่าได้เลือกตั้งค่า Deploy ให้เป็น Anyone (ทุกคนมีสิทธิ์เข้าถึง) หรือยัง");
-    }
-}
-
-function copyAppsScriptCode() {
-    const code = getGoogleAppsScriptCode();
-    navigator.clipboard.writeText(code).then(() => {
-        const btnText = document.getElementById('copy-btn-text');
-        btnText.innerText = "✓ คัดลอกสำเร็จ!";
-        setTimeout(() => btnText.innerText = "คัดลอกโค้ดสคริปต์", 2000);
-    }).catch(err => {
-        alert("ไม่สามารถคัดลอกอัตโนมัติได้ กรุณาลากเมาส์คลุมเพื่อคัดลอกในกล่องโค้ด");
-    });
-}
-
-// Google Apps Script source code template loaded inside settings guide
-function getGoogleAppsScriptCode() {
-    return `/**
- * ระบบบริหารจัดการคลังสินค้าเฟอร์นิเจอร์แบรนด์ Montipa & Motta (แยกคลัง)
- * ออกแบบระบบโดย: Banyawat thepthong (กุ๊ก)
- * 
- * 1. วางโค้ดนี้ลงใน App Script
- * 2. กด Deploy > New Deployment
- * 3. เลือกประเภท Web App
- * 4. ตั้งค่า Execute as: Me และ Who has access: Anyone
- */
-
-function doGet(e) {
-  var action = e.parameter.action;
-  var brand = e.parameter.brand;
-  
-  if (action === 'ping') {
-    return ContentService.createTextOutput(JSON.stringify({ status: 'pong' }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-  
-  if (action === 'get_brand_data') {
-    var data = getBrandDataFromSheets(brand);
-    return ContentService.createTextOutput(JSON.stringify({ status: 'success', data: data }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-function doPost(e) {
-  var postData = JSON.parse(e.postData.contents);
-  var action = postData.action;
-  
-  if (action === 'sync_brand_data') {
-    saveBrandDataToSheets(postData.brand, postData.data);
-    return ContentService.createTextOutput(JSON.stringify({ status: 'success' }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-  
-  if (action === 'upload_image') {
-    var fileUrl = saveImageToDrive(postData.image, postData.fileName);
-    return ContentService.createTextOutput(JSON.stringify({ status: 'success', url: fileUrl }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-// ฟังก์ชันดึงข้อมูลจากตาราง Google Sheet
-function getBrandDataFromSheets(brand) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  
-  // สร้างชีตหากยังไม่มีในไฟล์
-  var furnSheet = ss.getSheetByName(brand + "_furniture") || ss.insertSheet(brand + "_furniture");
-  var logSheet = ss.getSheetByName(brand + "_logs") || ss.insertSheet(brand + "_logs");
-  var branchSheet = ss.getSheetByName(brand + "_branches") || ss.insertSheet(brand + "_branches");
-  
-  // อ่านรายการเฟอร์นิเจอร์
-  var furnData = [];
-  var furnRows = furnSheet.getDataRange().getValues();
-  if (furnRows.length > 1) {
-    var headers = furnRows[0];
-    for (var i = 1; i < furnRows.length; i++) {
-      var row = furnRows[i];
-      var item = {};
-      for (var j = 0; j < headers.length; j++) {
-        item[headers[j]] = row[j];
-      }
-      furnData.push(item);
-    }
-  }
-  
-  // อ่านทรานแซกชัน Log
-  var logData = [];
-  var logRows = logSheet.getDataRange().getValues();
-  if (logRows.length > 1) {
-    var logHeaders = logRows[0];
-    for (var i = 1; i < logRows.length; i++) {
-      var row = logRows[i];
-      var log = {};
-      for (var j = 0; j < logHeaders.length; j++) {
-        log[logHeaders[j]] = row[j];
-      }
-      logData.push(log);
-    }
-  }
-
-  // อ่านข้อมูลสาขา
-  var branchData = [];
-  var branchRows = branchSheet.getDataRange().getValues();
-  if (branchRows.length > 1) {
-    var branchHeaders = branchRows[0];
-    for (var i = 1; i < branchRows.length; i++) {
-      var row = branchRows[i];
-      var branch = {};
-      for (var j = 0; j < branchHeaders.length; j++) {
-        branch[branchHeaders[j]] = row[j];
-      }
-      branchData.push(branch);
-    }
-  }
-  
-  return { branches: branchData, furniture: furnData, logs: logData };
-}
-
-// ฟังก์ชันเซฟข้อมูลทับลง Google Sheet
-function saveBrandDataToSheets(brand, data) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  
-  var furnSheet = ss.getSheetByName(brand + "_furniture") || ss.insertSheet(brand + "_furniture");
-  var logSheet = ss.getSheetByName(brand + "_logs") || ss.insertSheet(brand + "_logs");
-  var branchSheet = ss.getSheetByName(brand + "_branches") || ss.insertSheet(brand + "_branches");
-  
-  furnSheet.clear();
-  logSheet.clear();
-  branchSheet.clear();
-  
-  // 1. เขียนรายการเฟอร์นิเจอร์
-  if (data.furniture && data.furniture.length > 0) {
-    var headers = Object.keys(data.furniture[0]);
-    furnSheet.appendRow(headers);
-    for (var i = 0; i < data.furniture.length; i++) {
-      var row = [];
-      for (var j = 0; j < headers.length; j++) {
-        row.push(data.furniture[i][headers[j]]);
-      }
-      furnSheet.appendRow(row);
-    }
-  }
-  
-  // 2. เขียนประวัติความเคลื่อนไหว (Logs)
-  if (data.logs && data.logs.length > 0) {
-    var logHeaders = Object.keys(data.logs[0]);
-    logSheet.appendRow(logHeaders);
-    for (var i = 0; i < data.logs.length; i++) {
-      var row = [];
-      for (var j = 0; j < logHeaders.length; j++) {
-        row.push(data.logs[i][logHeaders[j]]);
-      }
-      logSheet.appendRow(row);
-    }
-  }
-
-  // 3. เขียนข้อมูลสาขา
-  if (data.branches && data.branches.length > 0) {
-    var branchHeaders = Object.keys(data.branches[0]);
-    branchSheet.appendRow(branchHeaders);
-    for (var i = 0; i < data.branches.length; i++) {
-      var row = [];
-      for (var j = 0; j < branchHeaders.length; j++) {
-        row.push(data.branches[i][branchHeaders[j]]);
-      }
-      branchSheet.appendRow(row);
-    }
-  }
-}
-
-// ฟังก์ชันอัปโหลดรูปภาพบันทึกไปยังโฟลเดอร์ Google Drive
-function saveImageToDrive(base64Data, fileName) {
-  try {
-    var parts = base64Data.split(';base64,');
-    var contentType = parts[0].split(':')[1];
-    var rawData = Utilities.base64Decode(parts[1]);
-    
-    var blob = Utilities.newBlob(rawData, contentType, fileName);
-    
-    // บันทึกไฟล์ไว้ในโฟลเดอร์สำหรับแอปพลิเคชันคลังเฟอร์ฯ
-    var folders = DriveApp.getFoldersByName("คลังรูปภาพเฟอร์นิเจอร์ Montipa-Motta");
-    var folder;
-    if (folders.hasNext()) {
-      folder = folders.next();
-    } else {
-      folder = DriveApp.createFolder("คลังรูปภาพเฟอร์นิเจอร์ Montipa-Motta");
-    }
-    
-    var file = folder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    
-    return "https://lh3.googleusercontent.com/d/" + file.getId();
-  } catch(e) {
-    return "error: " + e.toString();
-  }
-}`;
-}
 
 // ==========================================================================
 // 10. Core App Initial Boot setup hooks
@@ -3071,31 +2786,13 @@ window.addEventListener('DOMContentLoaded', () => {
     // 1. Initial local database load
     getLocalDatabase();
     
-    // Check for auto-configure cloud_url query parameter (e.g. from QR scan)
-    const urlParams = new URLSearchParams(window.location.search);
-    const cloudUrlParam = urlParams.get('cloud_url');
-    if (cloudUrlParam) {
-        const decodedUrl = decodeURIComponent(cloudUrlParam);
-        localStorage.setItem('kook_cloud_sheets_url', decodedUrl);
-        cloudScriptUrl = decodedUrl;
+    // 2. Read hardcoded cloud settings
+    if (HARDCODED_CLOUD_URL && HARDCODED_CLOUD_URL !== "YOUR_APPS_SCRIPT_URL_HERE" && HARDCODED_CLOUD_URL.trim() !== "") {
+        cloudScriptUrl = HARDCODED_CLOUD_URL.trim();
         isCloudConnected = true;
-        
-        // Clean URL to prevent re-triggering and keeping clutter
-        const cleanUrl = window.location.origin + window.location.pathname;
-        window.history.replaceState({}, document.title, cleanUrl);
-        
-        // Show elegant custom notification after brief delay
-        setTimeout(() => {
-            showSyncNotification('✓ เชื่อมต่อระบบคลาวด์อัตโนมัติสำเร็จ! 🟢');
-            renderDashboard();
-        }, 500);
     } else {
-        // 2. Read saved cloud settings
-        const savedCloudUrl = localStorage.getItem('kook_cloud_sheets_url');
-        if (savedCloudUrl) {
-            cloudScriptUrl = savedCloudUrl;
-            isCloudConnected = true;
-        }
+        cloudScriptUrl = "";
+        isCloudConnected = false;
     }
     
     // 3. Show/hide sync button based on cloud connection state

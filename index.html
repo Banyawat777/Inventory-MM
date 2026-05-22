@@ -101,10 +101,7 @@
                     <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/></svg>
                     <span>ระบบหลังบ้านจัดการข้อมูล</span>
                 </li>
-                <li class="menu-item" onclick="switchView('settings')" id="menu-settings">
-                    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-                    <span>ตั้งค่าระบบคลาวด์ชีต</span>
-                </li>
+
             </ul>
             
             <div class="sidebar-footer">
@@ -687,112 +684,7 @@
                     </div>
                 </div>
 
-                <!-- ==========================================================================
-                   7. หน้าตั้งค่าคลาวด์ชีต (Settings View)
-                   ========================================================================== -->
-                <div id="view-settings" class="view-section">
-                    <div class="settings-grid">
-                        
-                        <!-- Left Panel: Connection Settings Form -->
-                        <div class="glass-panel settings-panel">
-                            <div class="form-title-group">
-                                <h2 class="form-title">ตั้งค่าการเชื่อมต่อคลาวด์และฐานข้อมูล</h2>
-                                <p class="form-subtitle">เปลี่ยนมาใช้ Google Sheets เพื่อเก็บข้อมูลและเก็บรูปภาพใน Google Drive ของคุณ</p>
-                            </div>
-                            
-                            <!-- Connection Status -->
-                            <div class="connection-status-box disconnected" id="settings-status-box">
-                                <div class="connection-status-dot"></div>
-                                <span class="connection-status-text" id="settings-status-text">โหมดออฟไลน์ (LocalStorage Mode)</span>
-                            </div>
-                            
-                            <div class="form-grid">
-                                <div class="form-group form-full-col">
-                                    <label class="form-label">Google Apps Script Web App URL</label>
-                                    <input type="url" placeholder="https://script.google.com/macros/s/.../exec" class="form-input" id="settings-script-url" style="font-family: monospace; font-size: 12px;">
-                                    <p style="font-size: 11px; color: #64748B; margin-top: 2px;">
-                                        นำ URL ที่ได้จากการ Deploy สคริปต์ Google Apps Script เป็น Web App มาวางที่นี่
-                                    </p>
-                                </div>
-                                
-                                <div class="form-group form-full-col" style="display: flex; flex-direction: row; gap: 12px; margin-top: 8px;">
-                                    <button class="btn-checkout-confirm" onclick="saveConnectionSettings()" style="flex-grow: 1;">
-                                        บันทึกการตั้งค่า
-                                    </button>
-                                    <button class="btn-test-connection" onclick="testConnection()">
-                                        ทดสอบเชื่อมต่อ
-                                    </button>
-                                </div>
-                                
-                                <div class="form-group form-full-col" id="settings-disconnect-area" style="display: none; margin-top: 12px;">
-                                    <button class="btn-modal-cancel" style="width: 100%; border-color: #FECACA; color: #DC2626;" onclick="disconnectCloud()">
-                                        ตัดการเชื่อมต่อคลาวด์ (กลับไปใช้ Local Storage)
-                                    </button>
-                                </div>
-                                
-                                <!-- QR Code sharing for Mobile Setup -->
-                                <div class="form-group form-full-col" id="settings-qr-area" style="display: none; margin-top: 16px; border-top: 1px dashed rgba(148, 163, 184, 0.2); padding-top: 16px; text-align: center;">
-                                    <h4 class="form-title" style="font-size: 14px; margin-bottom: 8px;">📲 สแกนด้วยมือถือเพื่อเชื่อมต่ออัตโนมัติ</h4>
-                                    <p class="form-subtitle" style="font-size: 11px; margin-bottom: 12px;">สแกนคิวอาร์โค้ดนี้ด้วยมือถือของคุณเพื่อล็อกอินเชื่อมต่อระบบคลาวด์ตัวเดียวกันทันที!</p>
-                                    <div id="settings-qr-container" style="background: white; padding: 12px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin: 0 auto;">
-                                        <img id="settings-qr-img" src="" style="width: 150px; height: 150px; display: block;" alt="QR Code" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Right Panel: Google Sheets Setup Guide & Code Exporter -->
-                        <div class="glass-panel guide-panel">
-                            <h3 class="form-title">คู่มือเชื่อมโยงระบบใน 5 นาที</h3>
-                            <p class="form-subtitle">คัดลอกโค้ดสคริปต์นี้และทำตามขั้นตอนเพื่อให้ระบบบันทึกลงชีตอัตโนมัติ</p>
-                            
-                            <ol class="guide-step-list">
-                                <li class="guide-step-node">
-                                    <div class="guide-step-number">1</div>
-                                    <div class="guide-step-content">
-                                        เปิด **Google Sheets** ของคุณขึ้นมา 1 ชีต แล้วคลิกแถบเมนู **Extensions (ส่วนขยาย) > Apps Script**
-                                    </div>
-                                </li>
-                                <li class="guide-step-node">
-                                    <div class="guide-step-number">2</div>
-                                    <div class="guide-step-content">
-                                        ลบโค้ดเดิมในนั้นออกทั้งหมด แล้วนำโค้ดในกล่องสคริปต์ด้านล่างนี้ไป **คัดลอกและวาง** ลงไปแทนที่
-                                    </div>
-                                </li>
-                                
-                                <!-- Code Exporter Widget -->
-                                <div class="code-block-container">
-                                    <div class="code-block-header">
-                                        <span class="code-block-lang">Google Apps Script</span>
-                                        <button class="btn-copy-code" onclick="copyAppsScriptCode()">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                                            <span id="copy-btn-text">คัดลอกโค้ดสคริปต์</span>
-                                        </button>
-                                    </div>
-                                    <div class="code-block-area" id="apps-script-code-area">
-                                        <!-- Code string auto written by app.js -->
-                                    </div>
-                                </div>
-                                
-                                <li class="guide-step-node">
-                                    <div class="guide-step-number">3</div>
-                                    <div class="guide-step-content">
-                                        กดบันทึกโครงการ และกด **Deploy (ทำให้ใช้งานได้) > New deployment (การทำให้ใช้งานได้ใหม่)** เลือกประเภทเป็น **Web app (เว็บแอป)**
-                                    </div>
-                                </li>
-                                <li class="guide-step-node">
-                                    <div class="guide-step-number">4</div>
-                                    <div class="guide-step-content">
-                                        ตั้งค่าตัวเลือกดังนี้:
-                                        - **Execute as (เรียกใช้งานเป็น):** Me (ฉัน - บัญชี Gmail ของคุณ)
-                                        - **Who has access (ผู้ที่มีสิทธิ์เข้าถึง):** Anyone (ทุกคน)
-                                        จากนั้นกด Deploy แล้วคัดลอก **Web app URL** มาวางในช่องตั้งค่าด้านซ้ายเป็นอันเสร็จสิ้น!
-                                    </div>
-                                </li>
-                            </ol>
-                        </div>
-                    </div>
-                </div>
+
 
             </main>
             
