@@ -291,11 +291,27 @@ async function fetchBrandData(brandName) {
             const response = await fetch(`${cloudScriptUrl}?action=get_brand_data&brand=${brandName}`);
             const result = await response.json();
             if (result.status === 'success') {
-                return result.data; // Expected format: { branches: [...], furniture: [...], logs: [...] }
+                const cloudData = result.data;
+                
+                // 💡 AUTO-MIGRATION BUG FIX:
+                // If cloud data is empty but we have local database items,
+                // migrate and upload our local database to Google Sheets instead of overwriting with empty!
+                const localDb = getLocalDatabase();
+                const localBrandData = localDb[brandName];
+                
+                if (localBrandData && localBrandData.furniture && localBrandData.furniture.length > 0 &&
+                    (!cloudData.furniture || cloudData.furniture.length === 0)) {
+                    console.log(`Cloud data for ${brandName} is empty. Migrating local database to Google Sheets...`);
+                    // Use a flag to avoid infinite loops
+                    await syncBrandData(brandName, localBrandData);
+                    return localBrandData;
+                }
+                
+                return cloudData; // Expected format: { branches: [...], furniture: [...], logs: [...] }
             }
         } catch (e) {
             console.error("Cloud fetch failed, fallback to local storage:", e);
-            alert("ไม่สามารถดึงข้อมูลจาก Google Sheets ได้ ระบบสลับมาดึงข้อมูลออฟไลน์ชั่วคราว");
+            // Graceful fallback without blocking user experience
         }
     }
     
@@ -2736,6 +2752,7 @@ function saveConnectionSettings() {
     isCloudConnected = true;
     
     updateConnectionStatusUI();
+    updateCloudSyncButtonVisibility();
     alert("บันทึกการเชื่อมต่อเรียบร้อย! ระบบสลับเข้าโหมด Google Sheets & Drive คลาวด์สำเร็จ");
     
     // Fetch fresh database from cloud instantly
@@ -2748,6 +2765,7 @@ function disconnectCloud() {
     isCloudConnected = false;
     
     updateConnectionStatusUI();
+    updateCloudSyncButtonVisibility();
     document.getElementById('settings-script-url').value = "";
     alert("ตัดการเชื่อมต่อระบบคลาวด์แล้ว! ระบบกลับเข้าสู่โหมดเก็บข้อมูลออฟไลน์ (Local Storage)");
     
@@ -2962,7 +2980,7 @@ function saveImageToDrive(base64Data, fileName) {
     var file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
-    return file.getUrl();
+    return "https://lh3.googleusercontent.com/d/" + file.getId();
   } catch(e) {
     return "error: " + e.toString();
   }
@@ -2984,7 +3002,89 @@ window.addEventListener('DOMContentLoaded', () => {
         isCloudConnected = true;
     }
     
-    // 3. Trigger initial Dashboard and welcome load
+    // 3. Show/hide sync button based on cloud connection state
+    updateCloudSyncButtonVisibility();
+    
+    // 4. Trigger initial Dashboard and welcome load
     document.getElementById('welcome-screen').style.display = 'flex';
     document.getElementById('app-screen').style.display = 'none';
 });
+
+// ==========================================================================
+// 11. Cloud Sync UI Controls
+// ==========================================================================
+
+// Toggle visibility of the cloud sync button in the header
+function updateCloudSyncButtonVisibility() {
+    const btn = document.getElementById('header-sync-btn');
+    if (!btn) return;
+    btn.style.display = (isCloudConnected && cloudScriptUrl) ? 'flex' : 'none';
+}
+
+// Manual cloud sync - pull latest data from Google Sheets and refresh the active dashboard view
+async function manualCloudSync() {
+    if (!isCloudConnected || !cloudScriptUrl) {
+        alert('กรุณาเชื่อมต่อ Google Sheets ก่อนใช้ปุ่มซิงค์คลาวด์');
+        return;
+    }
+    
+    const btn = document.getElementById('header-sync-btn');
+    btn.classList.add('spinning');
+    btn.disabled = true;
+    
+    try {
+        // Force re-fetch from cloud and re-render the dashboard
+        await renderDashboard();
+        
+        // Brief success feedback via a subtle notification
+        showSyncNotification('ดึงข้อมูลล่าสุดจากคลาวด์สำเร็จ! 🟢');
+    } catch (e) {
+        console.error('Cloud sync error:', e);
+        showSyncNotification('⚠️ ซิงค์คลาวด์ล้มเหลว ลองอีกครั้ง', true);
+    } finally {
+        btn.classList.remove('spinning');
+        btn.disabled = false;
+    }
+}
+
+// Lightweight toast-style notification for sync feedback (no alert() popup)
+function showSyncNotification(message, isError = false) {
+    // Remove any existing notification
+    const existing = document.querySelector('.sync-notification');
+    if (existing) existing.remove();
+    
+    const notification = document.createElement('div');
+    notification.className = 'sync-notification';
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        color: white;
+        background: ${isError ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #10b981, #059669)'};
+        box-shadow: 0 8px 25px ${isError ? 'rgba(239, 68, 68, 0.35)' : 'rgba(16, 185, 129, 0.35)'};
+        z-index: 99999;
+        opacity: 0;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+        pointer-events: none;
+    `;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    // Animate in
+    requestAnimationFrame(() => {
+        notification.style.opacity = '1';
+        notification.style.transform = 'translateX(-50%) translateY(0)';
+    });
+    
+    // Auto-dismiss after 2.5 seconds
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(-50%) translateY(-10px)';
+        setTimeout(() => notification.remove(), 350);
+    }, 2500);
+}

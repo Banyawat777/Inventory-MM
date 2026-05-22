@@ -802,6 +802,46 @@ a {
     gap: 16px;
 }
 
+.btn-header-sync {
+    background: var(--brand-primary);
+    color: white;
+    border: none;
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: none; /* Controlled dynamically in JS */
+    align-items: center;
+    gap: 6px;
+    transition: all var(--transition-fast);
+    box-shadow: 0 4px 10px rgba(var(--brand-primary-rgb), 0.2);
+}
+
+.btn-header-sync:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(var(--brand-primary-rgb), 0.3);
+    filter: brightness(1.05);
+}
+
+.btn-header-sync:active {
+    transform: translateY(0);
+}
+
+.btn-header-sync .sync-icon {
+    transition: transform var(--transition-slow) ease;
+}
+
+.btn-header-sync.spinning .sync-icon {
+    animation: spin 1s infinite linear;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
 .header-barcode-search {
     display: flex;
     align-items: center;
